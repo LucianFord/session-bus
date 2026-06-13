@@ -1,0 +1,25 @@
+# Source & dev files
+src/
+tests/
+*.test.ts
+*.test.js
+
+# TypeScript config
+tsconfig.json
+tsconfig*.json
+
+# Test runner
+vitest.config.ts
+
+# Development docs
+CONTRIBUTING.md
+CHANGELOG.md
+
+# Build artifacts & tooling
+node_modules/
+*.log
+.DS_Store
+
+# Git
+.git/
+.gitignore
