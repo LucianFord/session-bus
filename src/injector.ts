@@ -6,6 +6,7 @@
  */
 
 import type { QueueMessage } from "./types.js";
+import { hashSessionKey, sanitizeContent } from "./sanitize.js";
 
 /**
  * Filter the messages that came after the cursor and that belong to a
@@ -30,8 +31,10 @@ export function buildInjectedContext(
   for (const msg of foreign) {
     const ts = new Date(msg.timestamp).toISOString();
     const role = msg.source === "user" ? "User" : "Assistant";
+    const sessionLabel = hashSessionKey(msg.sessionKey);
+    const content = sanitizeContent(msg.content, { maxLength: 0 });
     lines.push(
-      `[${ts}] [channel:${msg.channel}] [session:${msg.sessionKey}] ${role}: ${msg.content}`,
+      `[${ts}] [channel:${msg.channel}] [session:#${sessionLabel}] ${role}: ${content}`,
     );
   }
 

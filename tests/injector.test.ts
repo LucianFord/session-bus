@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildInjectedContext } from "../src/injector.js";
+import { sanitizeContent } from "../src/sanitize.js";
 import type { QueueMessage } from "../src/types.js";
 
 // ---------------------------------------------------------------------------
@@ -74,10 +75,12 @@ describe("buildInjectedContext", () => {
     expect(result).toContain("[channel:discord]");
   });
 
-  it("includes sessionKey in each line", () => {
-    const msgs = [makeMsg({ sessionKey: "session-xyz", channel: "telegram" })];
+  it("includes a hashed session label instead of the raw sessionKey", () => {
+    const msgs = [makeMsg({ sessionKey: "agent:main:openclaw-weixin:direct:o9cq801b-ufkyzplww0tzgqaa5ki@im.wechat", channel: "openclaw-weixin" })];
     const result = buildInjectedContext(msgs, "session-a")!;
-    expect(result).toContain("[session:session-xyz]");
+    expect(result).toContain("[session:#");
+    expect(result).not.toContain("o9cq801b");
+    expect(result).not.toContain("@im.wechat");
   });
 
   it("labels user messages as 'User'", () => {
@@ -92,6 +95,15 @@ describe("buildInjectedContext", () => {
     ];
     const result = buildInjectedContext(msgs, "session-a")!;
     expect(result).toContain("Assistant: sure thing");
+  });
+
+  it("sanitizes sensitive content before injection", () => {
+    const sensitive = "abRequestId=abc123; xsecappid=xhs; gid=abc; sk-or-v1-abcdefghijklmnopqrstuvwxyz";
+    const sanitized = sanitizeContent(sensitive);
+    expect(sanitized).not.toContain("abRequestId=abc123");
+    expect(sanitized).not.toContain("xsecappid=xhs");
+    expect(sanitized).not.toContain("sk-or-v1-");
+    expect(sanitized).toContain("[redacted");
   });
 
   it("preserves message order in the output", () => {
@@ -116,8 +128,7 @@ describe("buildInjectedContext", () => {
     const result = buildInjectedContext(msgs, "session-a")!;
     expect(result).toContain("from-b");
     expect(result).toContain("from-c");
-    expect(result).toContain("[session:session-b]");
-    expect(result).toContain("[session:session-c]");
+    expect(result).toContain("[session:#");
   });
 
   it("mixes own and foreign messages — skips own, includes foreign", () => {

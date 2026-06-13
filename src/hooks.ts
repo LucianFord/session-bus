@@ -11,6 +11,7 @@ import type { ResolvedConfig } from "./types.js";
 import { append, getTailId, readAll, readSince } from "./queue.js";
 import { getCursor, initCursor, setCursor } from "./cursor.js";
 import { buildInjectedContext } from "./injector.js";
+import { sanitizeChannel, sanitizeContent } from "./sanitize.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -119,8 +120,8 @@ export function registerHooks(api: OpenClawPluginApi, cfg: ResolvedConfig): void
         id: crypto.randomUUID(),
         sessionKey,
         source: "user",
-        content: truncateContent(ev.content ?? "(no content)", maxContentLength),
-        channel: c.channelId ?? "unknown",
+        content: sanitizeContent(truncateContent(ev.content ?? "(no content)", maxContentLength), { maxLength: 0 }),
+        channel: sanitizeChannel(c.channelId ?? "unknown"),
         timestamp: ev.timestamp ?? Date.now(),
       }, maxQueueSize);
     } catch (err) {
@@ -142,8 +143,8 @@ export function registerHooks(api: OpenClawPluginApi, cfg: ResolvedConfig): void
         id: crypto.randomUUID(),
         sessionKey,
         source: "assistant",
-        content: truncateContent(ev.content ?? "(no content)", maxContentLength),
-        channel: c.channelId ?? "unknown",
+        content: sanitizeContent(truncateContent(ev.content ?? "(no content)", maxContentLength), { maxLength: 0 }),
+        channel: sanitizeChannel(c.channelId ?? "unknown"),
         timestamp: Date.now(),
       }, maxQueueSize);
     } catch (err) {
@@ -189,8 +190,8 @@ export function registerHooks(api: OpenClawPluginApi, cfg: ResolvedConfig): void
         id: crypto.randomUUID(),
         sessionKey,
         source: "assistant",
-        content: truncateContent(content, maxContentLength),
-        channel: c.channelId ?? "unknown",
+        content: sanitizeContent(truncateContent(content, maxContentLength), { maxLength: 0 }),
+        channel: sanitizeChannel(c.channelId ?? "unknown"),
         timestamp: Date.now(),
       }, maxQueueSize);
     } catch (err) {
