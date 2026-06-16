@@ -248,4 +248,62 @@ export function registerHooks(api: OpenClawPluginApi, cfg: ResolvedConfig): void
       api.logger.warn(`[session-bus] after_compaction error for ${sessionKey}: ${String(err)}`);
     }
   });
+
+  // session_end — flush session context to daily log before the session is gone.
+  // This handles idle timeout, daily reset, manual /new, compaction, etc.
+  api.on("session_end", async (event, ctx) => {
+    const c = ctx as HookContext;
+    const sessionKey = c.sessionKey;
+    if (!sessionKey) return;
+
+    try {
+      // Read all messages for this session from the queue
+      const all = await readAll(storageDir);
+      const sessionMessages = all.filter((m) => m.sessionKey === sessionKey);
+
+      if (sessionMessages.length === 0) return;
+
+      // Build a compact summary of the session
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10);
+      const timeStr = now.toISOString().slice(11, 16);
+
+      // Get last few messages (both user and assistant) for context
+      const recentMessages = sessionMessages.slice(-20).map((m) => {
+        const ts = new Date(m.timestamp);
+        const h = ts.getHours().toString().padStart(2, "0");
+        const min = ts.getMinutes().toString().padStart(2, "0");
+        const role = m.source === "user" ? "User" : "Assistant";
+        return `[${h}:${min}] [${role}] ${m.content.slice(0, 200)}`;
+      });
+
+      const reason = (event as Record<string, unknown>).reason ?? "unknown";
+      const summary = [
+        `## ${timeStr} — Session 结束 (reason: ${reason})`,
+        "",
+        `Session: ${sessionKey}`,
+        `消息数: ${sessionMessages.length}`,
+        "",
+        "### 最近对话",
+        ...recentMessages.map((m) => `- ${m}`),
+        "",
+      ].join("\n");
+
+      // Write to daily log
+      const workspaceDir = process.env["OPENCLAW_WORKSPACE_DIR"]
+        || nodePath.join(os.homedir(), ".openclaw", "workspace");
+      const memoryDir = nodePath.join(workspaceDir, "memory");
+
+      if (!fs.existsSync(memoryDir)) {
+        fs.mkdirSync(memoryDir, { recursive: true });
+      }
+
+      const dailyLog = nodePath.join(memoryDir, `${dateStr}.md`);
+      fs.appendFileSync(dailyLog, summary, "utf8");
+
+      api.logger.info(`[session-bus] session_end flush: ${sessionKey} (${sessionMessages.length} msgs) → ${dailyLog}`);
+    } catch (err) {
+      api.logger.warn(`[session-bus] session_end flush error for ${sessionKey}: ${String(err)}`);
+    }
+  });
 }
